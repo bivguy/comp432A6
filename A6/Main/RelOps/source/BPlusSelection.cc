@@ -4,10 +4,41 @@
 
 #include "BPlusSelection.h"
 
-BPlusSelection :: BPlusSelection (MyDB_BPlusTreeReaderWriterPtr, MyDB_TableReaderWriterPtr,
-                MyDB_AttValPtr, MyDB_AttValPtr,
-                string, vector <string>) {}
+BPlusSelection :: BPlusSelection (MyDB_BPlusTreeReaderWriterPtr input, MyDB_TableReaderWriterPtr output,
+                MyDB_AttValPtr low, MyDB_AttValPtr high,
+                string selectionPredicate, vector <string> projections) 
+                {
+                    this->input = input;
+                    this->output = output;
+                    this->low = low;
+                    this->high = high;
+                    this->selectionPredicate = selectionPredicate;
+                    this->projections = projections;
+                }
 
-void BPlusSelection :: run () {}
+void BPlusSelection :: run () {
+    // get the input record
+    MyDB_RecordPtr inputRec = input->getEmptyRecord ();
+
+    // get all the records in the specified range
+    MyDB_RecordIteratorAltPtr iter = input->getRangeIteratorAlt(low, high);
+
+    // get the predicate
+    func pred = inputRec->compileComputation (selectionPredicate);
+
+    // go through all of the records
+    while (iter->advance ()) {
+        // load the current record
+        iter->getCurrent (inputRec);
+
+        // see if it is accepted by the predicate
+		if (!pred()->toBool ()) {
+			continue;
+		}
+
+        // now add this record to the output
+        output->append(inputRec);
+    }
+}
 
 #endif

@@ -84,7 +84,7 @@ void ScanJoin :: run () {
 		// hash the current record
 		myIter->getCurrent (leftInputRec);
 
-		// see if it is accepted by the preicate
+		// see if it is accepted by the predicate
 		if (!leftPred ()->toBool ()) {
 			continue;
 		}

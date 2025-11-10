@@ -15,7 +15,7 @@
 class ScanJoin {
 
 public:
-	// This creates a scan join of the tables maanged by leftInput and rightInput.
+	// This creates a scan join of the tables managed by leftInput and rightInput.
 	// The smaller of the two tables is stored in its entirity into a hash table, then
 	// the larger of the tables is scanned, and the output written to the table
 	// managed by the variable output.

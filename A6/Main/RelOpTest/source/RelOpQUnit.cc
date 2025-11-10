@@ -270,6 +270,7 @@ int main () {
 
 	cout << "loading right into B+-Tree indexed on r_address.\n";
 	supplierTableR->loadFromTextFile ("supplierBig.tbl");
+	cout << "loaded Table\n";
 
 	{
 
@@ -297,9 +298,10 @@ int main () {
 		MyDB_StringAttValPtr high = make_shared <MyDB_StringAttVal> ();
 		low->set ("aa");
 		high->set ("ab");
+		cout << "About to make a BPlusSelection Class\n";
 		BPlusSelection myOp (supplierTableR, supplierTableOut, low, high, 
 			"&& (&& ( > ([r_address], string[aa]), < ([r_address], string[ab])), > ([r_name], string[Supplier#000009000]))", projections);
-			
+		cout << "Made the BPlus Selection Class\n";
 		cout << "running selection\n";
 		myOp.run ();
 

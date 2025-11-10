@@ -19,7 +19,7 @@ public:
 	// In addition, only records having values between low and high (inclusive)
 	// for the B+-Tree's sort att are returned by the selection. 
 
-	// Te vector projections contains all of the computations that are
+	// The vector projections contains all of the computations that are
 	// performed to create the output records (see the ScanJoin for an example).
 	//
 	// Record are read from input, and written to output.
@@ -31,6 +31,13 @@ public:
 	// execute the selection operation
 	void run ();
 
+	private: 
+		MyDB_BPlusTreeReaderWriterPtr input;
+		MyDB_TableReaderWriterPtr output;
+		MyDB_AttValPtr low;
+		MyDB_AttValPtr high;
+		string selectionPredicate;
+		vector <string> projections;
 };
 
 #endif
