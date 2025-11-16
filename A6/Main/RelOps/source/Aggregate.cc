@@ -42,7 +42,7 @@ void Aggregate :: run () {
     vector <MyDB_PageReaderWriter> aggPages;
     aggPages.push_back(MyDB_PageReaderWriter(true, *input->getBufferMgr()));
 
-    MyDB_RecordPtr outputRec = output->getEmptyRecord ();
+    
     // create a schema that can store all of the required aggregate and grouping attributes
     MyDB_SchemaPtr aggSchema = make_shared <MyDB_Schema> ();
 
@@ -51,22 +51,21 @@ void Aggregate :: run () {
         aggSchema->appendAtt (p);
     }
 
-     // add an extra COUNT
-    pair<string, MyDB_AttTypePtr> countAtt = {"[count]", make_shared <MyDB_StringAttType> () };
+    string countName = "[count]";
+    // add an extra COUNT
+    pair<string, MyDB_AttTypePtr> countAtt = {"[count]", make_shared <MyDB_IntAttType> () };
     aggSchema->appendAtt(countAtt);
-    
 
-    MyDB_RecordPtr aggRecord = make_shared <MyDB_Record> (aggSchema);
-
-    aggSchema->getAtts();
+    MyDB_RecordPtr aggRec = make_shared <MyDB_Record> (aggSchema);
     
     // create input record and iterator
     MyDB_RecordPtr inputRec = input->getEmptyRecord ();
     MyDB_RecordIteratorAltPtr iter = getIteratorAlt (allPages);
 
+    vector<pair<string, MyDB_AttTypePtr>> aggAttributes = aggSchema->getAtts();
     // create the combined record schema
     MyDB_SchemaPtr combinedSchema = make_shared <MyDB_Schema> ();
-    for (auto &p : aggSchema->getAtts()) {
+    for (auto &p : aggAttributes) {
         combinedSchema->appendAtt(p);
     }
 
@@ -76,7 +75,7 @@ void Aggregate :: run () {
 
     // create the combined record
     MyDB_RecordPtr combinedRec = make_shared <MyDB_Record> ();
-    combinedRec->buildFrom (aggRecord, inputRec);
+    combinedRec->buildFrom (aggRec, inputRec);
 
     // have a function for each grouping clause
     vector <func> groupingFuncs;
@@ -84,8 +83,9 @@ void Aggregate :: run () {
         groupingFuncs.push_back(inputRec->compileComputation(groupings[i]));
     }
 
-    // groupings are always first
-
+    vector<pair<string, MyDB_AttTypePtr>> combinedRecAttributes = combinedSchema->getAtts();
+    // NOTE/TODO: grouping attributes are always first in the output/aggregrate record schema, figure out how the indices for this work
+    int numGroups = groupings.size();
     // have a function for each aggregate
     vector <func> aggComps;
     // create the count aggregate first
@@ -93,20 +93,19 @@ void Aggregate :: run () {
         string aggString;
         // get the aggregate 
         pair<MyDB_AggType, string> agg = aggsToCompute[i];
+        int oldAgIndex = i + numGroups;
+        string oldAggString = aggAttributes[oldAgIndex].first;
+
         // means we take the sum of the old agg + the new input record
         if (agg.first == MyDB_AggType :: sum || agg.first == MyDB_AggType :: avg) {
-            aggString = "+ (" + agg.second + ", " + ")";
-
-
+            aggString = "+ (" + agg.second + ", " + oldAggString + ")";
+        } else if (agg.first == MyDB_AggType :: cnt) {
+            aggString = "+ (" + countName + ", int[1])";
         }
-        // MyDB_AttValPtr aggAttr = aggRecord->getAtt(i);
-        // TODO: figure out what the correct string is
-        string aggString = agg.second;
+ 
         aggComps.push_back(combinedRec->compileComputation(aggString));
     }
-    // TODO: add an additional count aggregate
     
-
     func pred = inputRec->compileComputation (selectionPredicate);
 
     // go through the input table
@@ -125,18 +124,79 @@ void Aggregate :: run () {
 
         // update the attribute in the aggregate record for each aggregate we are computing
         for (size_t i = 0; i < aggComps.size(); i++) {
-            aggRecord->getAtt(i)->set(aggComps[i]());
+            aggRec->getAtt(i)->set(aggComps[i]());
         }
 
-        void* location = aggPages.back().appendAndReturnLocation(aggRecord);
-        myHash[hashVal] = location;
+        void* location = aggPages.back().appendAndReturnLocation(aggRec);
+        // check there is enough room in this last page
+        if (location == nullptr) {
+            // add another pinned anonymous page to this vector
+            aggPages.push_back(MyDB_PageReaderWriter(true, *input->getBufferMgr()));
+            location = aggPages.back().appendAndReturnLocation(aggRec);
+        }
 
-        // 5, 10, 15, 
+        // check if this aggregation exists in our hash table
+        auto it = myHash.find(hashVal);
 
+        if (it == myHash.end()) { 
+            // new aggregation value
+            myHash[hashVal] = location;
+        } else {
+            // get the current aggregate
+            void* curLocation = myHash[hashVal];
+            aggRec->fromBinary(curLocation);
 
+            // update the current aggregate
+            for (size_t i = 0; i < aggComps.size(); i++) {
+                aggRec->getAtt(i)->set(aggComps[i]());
+            }
+            aggRec->recordContentHasChanged();
+            // write it back after it's been updated
+            aggRec->toBinary(curLocation);
+        }
     }
 
     // for the final step of aggregate function, iterate over the hash map and append everything into the output table
+    MyDB_RecordPtr outRec = output->getEmptyRecord ();
+
+    vector <func> finalAggComps;
+
+    // create the final aggregation funcs
+    for (size_t i = 0; i < aggsToCompute.size(); i++) { 
+        string aggString;
+        pair<MyDB_AggType, string> agg = aggsToCompute[i];
+        // if the aggregation is avg then we divide by the count
+        if (agg.first == MyDB_AggType :: avg) { 
+            aggString = "/ (" + agg.second + ", " + countName + ")";
+        } else {
+            // otherwise just return the same value
+            aggString = agg.second;
+        }
+
+        finalAggComps.push_back(combinedRec->compileComputation(aggString));
+    }
+
+
+    // iterate over the hashmap
+    for (const auto& pair : myHash) {        
+        aggRec->fromBinary(pair.second);
+        
+        // set the grouping atts
+        int i;
+        for (i = 0; i < numGroups; i++) {
+                outRec->getAtt (i)->set (aggRec->getAtt (i));
+        }
+
+        // set the aggregate atts
+        for (auto a : finalAggComps) {
+            outRec->getAtt (i++)->set (a ());
+        }
+
+        outRec->recordContentHasChanged ();
+        output->append (outRec);
+    } 
+
+
     // NOTES: there are not new test cases from the current testing suite
 }
 
