@@ -38,29 +38,26 @@ void Aggregate :: run () {
         }
     } 
 
+    // create input record and iterator
+    MyDB_RecordPtr inputRec = input->getEmptyRecord ();
+    auto iter = getIteratorAlt (allPages);
+
     // represents the pinned anaonymous pages we add our aggregrate records to
     vector <MyDB_PageReaderWriter> aggPages;
     aggPages.push_back(MyDB_PageReaderWriter(true, *input->getBufferMgr()));
 
-    
     // create a schema that can store all of the required aggregate and grouping attributes
     MyDB_SchemaPtr aggSchema = make_shared <MyDB_Schema> ();
-
     for (auto &p : output->getTable ()->getSchema ()->getAtts ())
     {
         aggSchema->appendAtt (p);
     }
 
-    string countName = "[count]";
     // add an extra COUNT
+    string countName = "[count]";
     pair<string, MyDB_AttTypePtr> countAtt = {"[count]", make_shared <MyDB_IntAttType> () };
     aggSchema->appendAtt(countAtt);
-
     MyDB_RecordPtr aggRec = make_shared <MyDB_Record> (aggSchema);
-    
-    // create input record and iterator
-    MyDB_RecordPtr inputRec = input->getEmptyRecord ();
-    MyDB_RecordIteratorAltPtr iter = getIteratorAlt (allPages);
 
     vector<pair<string, MyDB_AttTypePtr>> aggAttributes = aggSchema->getAtts();
     // create the combined record schema
@@ -74,7 +71,7 @@ void Aggregate :: run () {
     }
 
     // create the combined record
-    MyDB_RecordPtr combinedRec = make_shared <MyDB_Record> ();
+    MyDB_RecordPtr combinedRec = make_shared <MyDB_Record> (combinedSchema);
     combinedRec->buildFrom (aggRec, inputRec);
 
     // have a function for each grouping clause
@@ -116,14 +113,19 @@ void Aggregate :: run () {
             continue;
         }
 
-        // hash the current record 
+        size_t i;
         size_t hashVal = 0;
-        for (auto &f : groupingFuncs) {
+        // go through each grouping func
+        for (i = 0; i < groupings.size(); i++) {
+            auto &f = groupingFuncs[i];
+            // set the grouping attribute value
+            aggRec->getAtt(i)->set(f());
+            // hash the current record 
             hashVal ^= f()->hash();
         }
 
         // update the attribute in the aggregate record for each aggregate we are computing
-        for (size_t i = 0; i < aggComps.size(); i++) {
+        for (; i < aggComps.size(); i++) {
             aggRec->getAtt(i)->set(aggComps[i]());
         }
 
@@ -156,27 +158,26 @@ void Aggregate :: run () {
         }
     }
 
-    // for the final step of aggregate function, iterate over the hash map and append everything into the output table
-    MyDB_RecordPtr outRec = output->getEmptyRecord ();
-
+    
     vector <func> finalAggComps;
-
     // create the final aggregation funcs
     for (size_t i = 0; i < aggsToCompute.size(); i++) { 
         string aggString;
+        string oldAggString = aggAttributes[i + numGroups].first;
         pair<MyDB_AggType, string> agg = aggsToCompute[i];
         // if the aggregation is avg then we divide by the count
-        if (agg.first == MyDB_AggType :: avg) { 
-            aggString = "/ (" + agg.second + ", " + countName + ")";
+        if (aggsToCompute[i].first == MyDB_AggType :: avg) { 
+            aggString = "/ (" + oldAggString + ", " + countName + ")";
         } else {
             // otherwise just return the same value
-            aggString = agg.second;
+            aggString = oldAggString;
         }
 
         finalAggComps.push_back(combinedRec->compileComputation(aggString));
     }
 
-
+    // for the final step of aggregate function, iterate over the hash map and append everything into the output table
+    MyDB_RecordPtr outRec = output->getEmptyRecord ();
     // iterate over the hashmap
     for (const auto& pair : myHash) {        
         aggRec->fromBinary(pair.second);
