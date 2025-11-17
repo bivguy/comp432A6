@@ -4,9 +4,30 @@
 
 #include "RegularSelection.h"
 
-RegularSelection :: RegularSelection (MyDB_TableReaderWriterPtr, MyDB_TableReaderWriterPtr,
-                string, vector <string>) {}
+void RegularSelection :: run () {
+    MyDB_RecordIteratorAltPtr iterator = this->input->getIteratorAlt();
+    MyDB_RecordPtr inRecord = this->input->getEmptyRecord();
+    MyDB_RecordPtr outRecord = this->output->getEmptyRecord();
 
-void RegularSelection :: run () {}
+    vector<func> computations;
+    for (auto& predicate : this->projections)
+        computations.push_back(inRecord->compileComputation(predicate));
+
+    func selectionPredicate = inRecord->compileComputation(this->selectionPredicate);
+
+    while (iterator->advance()) {
+        iterator->getCurrent(inRecord);
+
+        if (selectionPredicate()->toBool()) {
+            int i = 0;
+            for (auto& computation : computations)
+                outRecord->getAtt(i++)->set(computation());
+
+            outRecord->recordContentHasChanged();
+
+            this->output->append(outRecord);
+        }
+    }
+}
 
 #endif

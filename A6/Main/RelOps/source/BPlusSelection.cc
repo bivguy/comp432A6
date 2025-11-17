@@ -26,6 +26,12 @@ void BPlusSelection :: run () {
     // get the predicate
     func pred = inputRec->compileComputation (selectionPredicate);
 
+    vector<func> computations;
+    for (auto& projection : this->projections)
+        computations.push_back(inputRec->compileComputation(projection));
+
+    MyDB_RecordPtr outputRec = output->getEmptyRecord();
+
     // go through all of the records
     while (iter->advance ()) {
         // load the current record
@@ -36,8 +42,14 @@ void BPlusSelection :: run () {
 			continue;
 		}
 
+        int i = 0;
+        for (auto& computation : computations)
+            outputRec->getAtt(i++)->set(computation());
+
+        outputRec->recordContentHasChanged();
+
         // now add this record to the output
-        output->append(inputRec);
+        output->append(outputRec);
     }
 }
 

@@ -109,6 +109,10 @@ public:
 	// used by the method compileComputation above
 	friend function <bool ()> buildRecordComparator (MyDB_RecordPtr lhs,  MyDB_RecordPtr rhs, string computation);
 
+	friend function <bool ()> buildRecordComparatorLt (MyDB_RecordPtr lhs,  MyDB_RecordPtr rhs, string computation1, string computation2);
+
+	friend function <bool ()> buildRecordComparatorEq (MyDB_RecordPtr lhs,  MyDB_RecordPtr rhs, string computation1, string computation2);
+
 	// access the schema
 	MyDB_SchemaPtr &getSchema ();
 

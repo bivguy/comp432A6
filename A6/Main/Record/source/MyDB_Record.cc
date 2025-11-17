@@ -837,8 +837,37 @@ function <bool ()> buildRecordComparator (MyDB_RecordPtr lhs,  MyDB_RecordPtr rh
 	// and then build a lambda that performs the computatation
 	auto res = lhs->lt (lhsFunc, rhsFunc);
 	func temp = res.first;
-	return [=] {return temp ()->toBool ();};
-	
+	return [=] {return temp ()->toBool ();};	
+}
+
+function <bool ()> buildRecordComparatorLt (MyDB_RecordPtr lhs,  MyDB_RecordPtr rhs, string computation1, string computation2) {
+
+	// compile a computation over the LHS and over the RHS
+	char *str1 = (char *) computation1.c_str ();
+	pair <func, MyDB_AttTypePtr> lhsFunc = lhs->compileHelper (str1);
+
+	char *str2 = (char *) computation2.c_str ();
+	pair <func, MyDB_AttTypePtr> rhsFunc = rhs->compileHelper (str2);
+
+	// and then build a lambda that performs the computatation
+	auto res = lhs->lt (lhsFunc, rhsFunc);
+	func temp = res.first;
+	return [=] {return temp ()->toBool ();};	
+}
+
+function <bool ()> buildRecordComparatorEq (MyDB_RecordPtr lhs,  MyDB_RecordPtr rhs, string computation1, string computation2) {
+
+	// compile a computation over the LHS and over the RHS
+	char *str1 = (char *) computation1.c_str ();
+	pair <func, MyDB_AttTypePtr> lhsFunc = lhs->compileHelper (str1);
+
+	char *str2 = (char *) computation2.c_str ();
+	pair <func, MyDB_AttTypePtr> rhsFunc = rhs->compileHelper (str2);
+
+	// and then build a lambda that performs the computatation
+	auto res = lhs->eq(lhsFunc, rhsFunc);
+	func temp = res.first;
+	return [=] {return temp ()->toBool ();};	
 }
 
 MyDB_Record :: MyDB_Record (MyDB_SchemaPtr mySchemaIn) {
