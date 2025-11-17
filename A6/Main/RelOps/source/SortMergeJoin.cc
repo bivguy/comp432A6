@@ -118,7 +118,6 @@ void SortMergeJoin :: run () {
                 bool rightFinished = false;
                 // Iterate through the right table
                 while (tempComparator()) {
-                    MyDB_RecordPtr tempRecord = this->leftTable->getEmptyRecord();
                     MyDB_RecordIteratorAltPtr tempIterator = getIteratorAlt(savedRecords);
                     
                     while (tempIterator->advance()) {

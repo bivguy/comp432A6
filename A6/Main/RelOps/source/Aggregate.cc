@@ -6,7 +6,7 @@
 #include "MyDB_PageReaderWriter.h"
 #include "MyDB_TableReaderWriter.h"
 #include "Aggregate.h"
-#include <unordered_map>
+#include <map>
 
 using namespace std;
 
@@ -25,7 +25,7 @@ Aggregate :: Aggregate (
     }
 
 void Aggregate :: run () {
-    unordered_map <size_t, void *> myHash;
+    map <size_t, void *> myHash;
     // get all of the pages and pin them
     vector <MyDB_PageReaderWriter> allPages;
     input->getBufferMgr()->getPinnedPage();
@@ -62,17 +62,17 @@ void Aggregate :: run () {
     vector<pair<string, MyDB_AttTypePtr>> aggAttributes = aggSchema->getAtts();
     // create the combined record schema
     MyDB_SchemaPtr combinedSchema = make_shared <MyDB_Schema> ();
-    for (auto &p : aggAttributes) {
+    for (auto &p : inputRec->getSchema()->getAtts()) {
         combinedSchema->appendAtt(p);
     }
 
-    for (auto &p : inputRec->getSchema()->getAtts()) {
+    for (auto &p : aggAttributes) {
         combinedSchema->appendAtt(p);
     }
 
     // create the combined record
     MyDB_RecordPtr combinedRec = make_shared <MyDB_Record> (combinedSchema);
-    combinedRec->buildFrom (aggRec, inputRec);
+    combinedRec->buildFrom (inputRec, aggRec);
 
     // have a function for each grouping clause
     vector <func> groupingFuncs;
@@ -143,9 +143,8 @@ void Aggregate :: run () {
         // means it's a new aggregation
         if (it == myHash.end()) { 
             for (size_t i = 0; i < aggComps.size(); i++) {
-                aggRec->getAtt(i+numGroups)->set(defaultAggComps[i]()); // Smth not right here
+                aggRec->getAtt(i+numGroups)->set(defaultAggComps[i]());
             }
-            // aggRec->getAtt(numGroups + aggsToCompute.size())->set(aggComps.back()());   // internal count
 
             aggRec->recordContentHasChanged();
             void* location = aggPages.back().appendAndReturnLocation(aggRec);
