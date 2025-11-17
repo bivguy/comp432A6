@@ -151,13 +151,13 @@ void Aggregate :: run () {
             }
             
             // set the grouping attribute values
-            for (size_t i = 0; i < groupings.size(); i++) {
-                auto &f = groupingFuncs[i];
-                aggRec->getAtt(i)->set(f());
-            }
+            // for (size_t i = 0; i < groupings.size(); i++) {
+            //     auto &f = groupingFuncs[i];
+            //     aggRec->getAtt(i)->set(f());
+            // }
 
             // Write the contents after setting.
-            aggRec->toBinary(location);
+            // aggRec->toBinary(location);
             
             // new aggregation value
             myHash[hashVal] = location;
@@ -168,7 +168,7 @@ void Aggregate :: run () {
 
             // update the current aggregate
             for (size_t i = 0; i < aggComps.size(); i++) {
-                aggRec->getAtt(i)->set(aggComps[i]());
+                aggRec->getAtt(i + numGroups)->set(aggComps[i]());
             }
             aggRec->recordContentHasChanged();
             // write it back after it's been updated
