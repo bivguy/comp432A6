@@ -81,8 +81,9 @@ void Aggregate :: run () {
     }
 
     vector<pair<string, MyDB_AttTypePtr>> combinedRecAttributes = combinedSchema->getAtts();
-    // NOTE/TODO: grouping attributes are always first in the output/aggregrate record schema, figure out how the indices for this work
+    // NOTE: grouping attributes are always first in the output/aggregrate record schema
     int numGroups = groupings.size();
+    
     // have a function for each aggregate
     vector <func> aggComps;
     // create the count aggregate first
@@ -102,7 +103,9 @@ void Aggregate :: run () {
  
         aggComps.push_back(combinedRec->compileComputation(aggString));
     }
-    
+    // add the count aggregate
+    aggComps.push_back(combinedRec->compileComputation("+ (" + countName + ", int[1])"));
+
     func pred = inputRec->compileComputation (selectionPredicate);
 
     // go through the input table
@@ -112,11 +115,10 @@ void Aggregate :: run () {
         if (!pred()->toBool()) {
             continue;
         }
-
-        size_t i;
+        
         size_t hashVal = 0;
         // go through each grouping func
-        for (i = 0; i < groupings.size(); i++) {
+        for (size_t i = 0; i < groupings.size(); i++) {
             auto &f = groupingFuncs[i];
             // set the grouping attribute value
             aggRec->getAtt(i)->set(f());
@@ -125,8 +127,8 @@ void Aggregate :: run () {
         }
 
         // update the attribute in the aggregate record for each aggregate we are computing
-        for (; i < aggComps.size(); i++) {
-            aggRec->getAtt(i)->set(aggComps[i]());
+        for (size_t i = 0; i < aggComps.size(); i++) {
+            aggRec->getAtt(i)->set(aggComps[i + numGroups]());
         }
 
         void* location = aggPages.back().appendAndReturnLocation(aggRec);
@@ -141,6 +143,12 @@ void Aggregate :: run () {
         auto it = myHash.find(hashVal);
 
         if (it == myHash.end()) { 
+            // set the grouping attribute values
+            for (size_t i = 0; i < groupings.size(); i++) {
+                auto &f = groupingFuncs[i];
+                aggRec->getAtt(i)->set(f());
+            }
+            
             // new aggregation value
             myHash[hashVal] = location;
         } else {
@@ -173,7 +181,7 @@ void Aggregate :: run () {
             aggString = oldAggString;
         }
 
-        finalAggComps.push_back(combinedRec->compileComputation(aggString));
+        finalAggComps.push_back(aggRec->compileComputation(aggString));
     }
 
     // for the final step of aggregate function, iterate over the hash map and append everything into the output table
@@ -202,4 +210,3 @@ void Aggregate :: run () {
 }
 
 #endif
-
