@@ -86,8 +86,10 @@ void Aggregate :: run () {
     cout << "about to make the agg functions \n" << flush;
     // have a function for each aggregate
     vector <func> aggComps;
+    vector <func> defaultAggComps;
     for (size_t i = 0; i < aggsToCompute.size(); i++) {
         string aggString;
+        string defaultAggString;
         // get the aggregate 
         pair<MyDB_AggType, string> agg = aggsToCompute[i];
         int oldAgIndex = i + numGroups;
@@ -96,16 +98,20 @@ void Aggregate :: run () {
         // means we take the sum of the old agg + the new input record
         if (agg.first == MyDB_AggType :: sum || agg.first == MyDB_AggType :: avg) {
             aggString = "+ (" + agg.second + ", [" + oldAggString + "])";
+            defaultAggString = agg.second;
         } else if (agg.first == MyDB_AggType :: cnt) {
             aggString = "+ ([" + oldAggString + "], int[1])";
+            defaultAggString = "int[1]";
         }
         cout << "About to compile the agg functions " << aggString << "\n" << flush;
         aggComps.push_back(combinedRec->compileComputation(aggString));
+        defaultAggComps.push_back(combinedRec->compileComputation(defaultAggString));
     }
 
     cout << "finished making the agg functions \n" << flush;
     // add the count aggregate
     aggComps.push_back(combinedRec->compileComputation("+ ([" + countName + "], int[1])"));
+    defaultAggComps.push_back(combinedRec->compileComputation("int[0]"));
 
     cout << "finished making the count agg function \n" << flush;
 
@@ -130,19 +136,18 @@ void Aggregate :: run () {
         }
 
         // update the attribute in the aggregate record for each aggregate we are computing
-        for (size_t i = 0; i < aggComps.size(); i++) {
-            aggRec->getAtt(i+numGroups)->set(aggComps[i]());
-        }
-        // aggRec->getAtt(numGroups + aggsToCompute.size())->set(aggComps.back()());   // internal count
-
-        aggRec->recordContentHasChanged();
-
 
         // check if this aggregation exists in our hash table
         auto it = myHash.find(hashVal);
 
         // means it's a new aggregation
         if (it == myHash.end()) { 
+            for (size_t i = 0; i < aggComps.size(); i++) {
+                aggRec->getAtt(i+numGroups)->set(defaultAggComps[i]()); // Smth not right here
+            }
+            // aggRec->getAtt(numGroups + aggsToCompute.size())->set(aggComps.back()());   // internal count
+
+            aggRec->recordContentHasChanged();
             void* location = aggPages.back().appendAndReturnLocation(aggRec);
             
             // check there is enough room in this last page
@@ -151,15 +156,6 @@ void Aggregate :: run () {
                 aggPages.push_back(MyDB_PageReaderWriter(false, *input->getBufferMgr()));
                 location = aggPages.back().appendAndReturnLocation(aggRec);
             }
-            
-            // set the grouping attribute values
-            // for (size_t i = 0; i < groupings.size(); i++) {
-            //     auto &f = groupingFuncs[i];
-            //     aggRec->getAtt(i)->set(f());
-            // }
-
-            // Write the contents after setting.
-            // aggRec->toBinary(location);
             
             // new aggregation value
             myHash[hashVal] = location;
