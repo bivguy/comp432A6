@@ -30,11 +30,11 @@ void Aggregate :: run () {
     vector <MyDB_PageReaderWriter> allPages;
     input->getBufferMgr()->getPinnedPage();
     for (int i = 0; i < input->getNumPages (); i++) {
-        MyDB_PageReaderWriter pinnedPage = input->getPinned (i);
+        MyDB_PageReaderWriter page = input->operator[](i);
 
-        if (pinnedPage.getType () == MyDB_PageType :: RegularPage)
+        if (page.getType () == MyDB_PageType :: RegularPage)
         {
-            allPages.push_back (input->getPinned (i));
+            allPages.push_back (page);
         }
     } 
 
@@ -146,7 +146,7 @@ void Aggregate :: run () {
             // check there is enough room in this last page
             if (location == nullptr) {
                 // add another pinned anonymous page to this vector
-                aggPages.push_back(MyDB_PageReaderWriter(true, *input->getBufferMgr()));
+                aggPages.push_back(MyDB_PageReaderWriter(false, *input->getBufferMgr()));
                 location = aggPages.back().appendAndReturnLocation(aggRec);
             }
             
@@ -155,6 +155,9 @@ void Aggregate :: run () {
                 auto &f = groupingFuncs[i];
                 aggRec->getAtt(i)->set(f());
             }
+
+            // Write the contents after setting.
+            aggRec->toBinary(location);
             
             // new aggregation value
             myHash[hashVal] = location;
