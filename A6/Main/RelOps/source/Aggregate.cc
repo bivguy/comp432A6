@@ -135,6 +135,8 @@ void Aggregate :: run () {
         }
         // aggRec->getAtt(numGroups + aggsToCompute.size())->set(aggComps.back()());   // internal count
 
+        aggRec->recordContentHasChanged();
+
 
         // check if this aggregation exists in our hash table
         auto it = myHash.find(hashVal);
