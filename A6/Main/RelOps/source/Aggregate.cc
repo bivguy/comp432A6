@@ -111,7 +111,7 @@ void Aggregate :: run () {
     cout << "finished making the agg functions \n" << flush;
     // add the count aggregate
     aggComps.push_back(combinedRec->compileComputation("+ ([" + countName + "], int[1])"));
-    defaultAggComps.push_back(combinedRec->compileComputation("int[0]"));
+    defaultAggComps.push_back(combinedRec->compileComputation("int[1]"));
 
     cout << "finished making the count agg function \n" << flush;
 
