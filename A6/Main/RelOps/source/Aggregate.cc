@@ -86,7 +86,6 @@ void Aggregate :: run () {
     cout << "about to make the agg functions \n" << flush;
     // have a function for each aggregate
     vector <func> aggComps;
-    // create the count aggregate first
     for (size_t i = 0; i < aggsToCompute.size(); i++) {
         string aggString;
         // get the aggregate 
@@ -96,7 +95,7 @@ void Aggregate :: run () {
 
         // means we take the sum of the old agg + the new input record
         if (agg.first == MyDB_AggType :: sum || agg.first == MyDB_AggType :: avg) {
-            aggString = "+ ( [" + agg.second + "], [" + oldAggString + "])";
+            aggString = "+ (" + agg.second + ", [" + oldAggString + "])";
         } else if (agg.first == MyDB_AggType :: cnt) {
             aggString = "+ ([" + oldAggString + "], int[1])";
         }
@@ -134,6 +133,8 @@ void Aggregate :: run () {
         for (size_t i = 0; i < aggComps.size(); i++) {
             aggRec->getAtt(i+numGroups)->set(aggComps[i]());
         }
+        // aggRec->getAtt(numGroups + aggsToCompute.size())->set(aggComps.back()());   // internal count
+
 
         // check if this aggregation exists in our hash table
         auto it = myHash.find(hashVal);
@@ -181,11 +182,13 @@ void Aggregate :: run () {
         pair<MyDB_AggType, string> agg = aggsToCompute[i];
         // if the aggregation is avg then we divide by the count
         if (aggsToCompute[i].first == MyDB_AggType :: avg) { 
-            aggString = "/ (" + oldAggString + ", " + countName + ")";
+            aggString = "/ ([" + oldAggString + "], [" + countName + "])";
         } else {
             // otherwise just return the same value
             aggString = "[" + oldAggString + "]";
         }
+
+        cout << "About to compile the final agg functions " << aggString << "\n" << flush;
 
         finalAggComps.push_back(aggRec->compileComputation(aggString));
     }

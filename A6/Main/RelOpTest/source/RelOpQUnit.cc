@@ -58,7 +58,7 @@ int main () {
 	MyDB_TablePtr myTableRight = make_shared <MyDB_Table> ("supplierRight", "supplierRight.bin", mySchemaR);
 
 	// get the tables
-	MyDB_BufferManagerPtr myMgr = make_shared <MyDB_BufferManager> (131072, 128, "tempFile");
+	MyDB_BufferManagerPtr myMgr = make_shared <MyDB_BufferManager> (131072, 1028, "tempFile");
 	MyDB_TableReaderWriterPtr supplierTableL = make_shared <MyDB_TableReaderWriter> (myTableLeft, myMgr);
 	MyDB_TableReaderWriterPtr supplierTableRNoBPlus = make_shared <MyDB_TableReaderWriter> (myTableRight, myMgr);
 
