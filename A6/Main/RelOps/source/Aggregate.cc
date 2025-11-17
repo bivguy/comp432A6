@@ -54,8 +54,8 @@ void Aggregate :: run () {
     }
 
     // add an extra COUNT
-    string countName = "[count]";
-    pair<string, MyDB_AttTypePtr> countAtt = {"[count]", make_shared <MyDB_IntAttType> () };
+    string countName = "COUNT";
+    pair<string, MyDB_AttTypePtr> countAtt = {countName, make_shared <MyDB_IntAttType> () };
     aggSchema->appendAtt(countAtt);
     MyDB_RecordPtr aggRec = make_shared <MyDB_Record> (aggSchema);
 
@@ -128,21 +128,23 @@ void Aggregate :: run () {
 
         // update the attribute in the aggregate record for each aggregate we are computing
         for (size_t i = 0; i < aggComps.size(); i++) {
-            aggRec->getAtt(i)->set(aggComps[i + numGroups]());
-        }
-
-        void* location = aggPages.back().appendAndReturnLocation(aggRec);
-        // check there is enough room in this last page
-        if (location == nullptr) {
-            // add another pinned anonymous page to this vector
-            aggPages.push_back(MyDB_PageReaderWriter(true, *input->getBufferMgr()));
-            location = aggPages.back().appendAndReturnLocation(aggRec);
+            aggRec->getAtt(i+numGroups)->set(aggComps[i]());
         }
 
         // check if this aggregation exists in our hash table
         auto it = myHash.find(hashVal);
 
+        // means it's a new aggregation
         if (it == myHash.end()) { 
+            void* location = aggPages.back().appendAndReturnLocation(aggRec);
+            
+            // check there is enough room in this last page
+            if (location == nullptr) {
+                // add another pinned anonymous page to this vector
+                aggPages.push_back(MyDB_PageReaderWriter(true, *input->getBufferMgr()));
+                location = aggPages.back().appendAndReturnLocation(aggRec);
+            }
+            
             // set the grouping attribute values
             for (size_t i = 0; i < groupings.size(); i++) {
                 auto &f = groupingFuncs[i];
