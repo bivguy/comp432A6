@@ -83,7 +83,6 @@ void Aggregate :: run () {
     vector<pair<string, MyDB_AttTypePtr>> combinedRecAttributes = combinedSchema->getAtts();
     // NOTE: grouping attributes are always first in the output/aggregrate record schema
     int numGroups = groupings.size();
-    cout << "about to make the agg functions \n" << flush;
     // have a function for each aggregate
     vector <func> aggComps;
     vector <func> defaultAggComps;
@@ -103,17 +102,13 @@ void Aggregate :: run () {
             aggString = "+ ([" + oldAggString + "], int[1])";
             defaultAggString = "int[1]";
         }
-        cout << "About to compile the agg functions " << aggString << "\n" << flush;
         aggComps.push_back(combinedRec->compileComputation(aggString));
         defaultAggComps.push_back(combinedRec->compileComputation(defaultAggString));
     }
 
-    cout << "finished making the agg functions \n" << flush;
     // add the count aggregate
     aggComps.push_back(combinedRec->compileComputation("+ ([" + countName + "], int[1])"));
     defaultAggComps.push_back(combinedRec->compileComputation("int[1]"));
-
-    cout << "finished making the count agg function \n" << flush;
 
     func pred = inputRec->compileComputation (selectionPredicate);
 
@@ -173,7 +168,6 @@ void Aggregate :: run () {
         }
     }
 
-    cout << "about to make the final agg functions \n" << flush;
     vector <func> finalAggComps;
     // create the final aggregation funcs
     for (size_t i = 0; i < aggsToCompute.size(); i++) { 
@@ -188,12 +182,8 @@ void Aggregate :: run () {
             aggString = "[" + oldAggString + "]";
         }
 
-        cout << "About to compile the final agg functions " << aggString << "\n" << flush;
-
         finalAggComps.push_back(aggRec->compileComputation(aggString));
     }
-
-    cout << "finished making the final agg functions \n" << flush;
 
     // for the final step of aggregate function, iterate over the hash map and append everything into the output table
     MyDB_RecordPtr outRec = output->getEmptyRecord ();
