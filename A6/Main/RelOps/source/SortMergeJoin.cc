@@ -60,13 +60,7 @@ void SortMergeJoin :: run () {
     func finalPredicate = combinedRecord->compileComputation(this->finalSelectionPredicate);
 
     MyDB_RecordPtr tempRecord = this->leftTable->getEmptyRecord();
-    if (!leftq->advance()) {
-        // do something
-    }
-    else if (!rightq->advance()) {
-        // do something
-    }
-    else {
+    if (leftq->advance() && rightq->advance()) {
         leftq->getCurrent(tempRecord);
         rightq->getCurrent(rightRecord);
 
